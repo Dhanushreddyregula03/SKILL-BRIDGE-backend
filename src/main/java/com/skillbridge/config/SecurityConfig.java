@@ -33,57 +33,134 @@ public class SecurityConfig {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
 
+    // Password encryption
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+    // Authentication manager
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration)
+    public AuthenticationManager authenticationManager(
+            AuthenticationConfiguration authenticationConfiguration)
             throws Exception {
+
         return authenticationConfiguration.getAuthenticationManager();
     }
 
+    // Security configuration
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http)
+            throws Exception {
+
         http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                // Enable CORS
+                .cors(cors ->
+                        cors.configurationSource(corsConfigurationSource()))
+
+                // Disable CSRF for REST APIs
                 .csrf(AbstractHttpConfigurer::disable)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::disable)) // For H2 console
+
+                // Use stateless authentication
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(
+                                SessionCreationPolicy.STATELESS))
+
+                // Allow H2 database console frames
+                .headers(headers ->
+                        headers.frameOptions(
+                                HeadersConfigurer.FrameOptionsConfig::disable))
+
+                // Endpoint permissions
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints
+
+                        // Allow the root and error endpoints
+                        .requestMatchers("/", "/error").permitAll()
+
+                        // Authentication endpoints
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/internships/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/ai/analyze-gap/public").permitAll()
+
+                        // Public internship listings
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/internships/**").permitAll()
+
+                        // Public AI skill-gap analysis
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/ai/analyze-gap/public").permitAll()
+
+                        // H2 database console
                         .requestMatchers("/h2-console/**").permitAll()
-                        // Recruiter-specific endpoints
-                        .requestMatchers(HttpMethod.POST, "/api/internships/**").hasAuthority("ROLE_EMPLOYER")
-                        .requestMatchers(HttpMethod.PUT, "/api/internships/**").hasAuthority("ROLE_EMPLOYER")
-                        .requestMatchers(HttpMethod.DELETE, "/api/internships/**").hasAuthority("ROLE_EMPLOYER")
-                        .requestMatchers("/api/recruiter/**").hasAuthority("ROLE_EMPLOYER")
-                        // Student-specific endpoints
-                        .requestMatchers("/api/student/**").hasAuthority("ROLE_STUDENT")
-                        // General authenticated endpoints
+
+                        // Employer-only internship management
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/internships/**")
+                        .hasAuthority("ROLE_EMPLOYER")
+
+                        .requestMatchers(HttpMethod.PUT,
+                                "/api/internships/**")
+                        .hasAuthority("ROLE_EMPLOYER")
+
+                        .requestMatchers(HttpMethod.DELETE,
+                                "/api/internships/**")
+                        .hasAuthority("ROLE_EMPLOYER")
+
+                        // Employer-only endpoints
+                        .requestMatchers("/api/recruiter/**")
+                        .hasAuthority("ROLE_EMPLOYER")
+
+                        // Student-only endpoints
+                        .requestMatchers("/api/student/**")
+                        .hasAuthority("ROLE_STUDENT")
+
+                        // All other endpoints require authentication
                         .anyRequest().authenticated()
                 );
 
-        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        // Add JWT authentication filter
+        http.addFilterBefore(
+                jwtAuthenticationFilter,
+                UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
+    // CORS configuration
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
+
         CorsConfiguration configuration = new CorsConfiguration();
+
         configuration.setAllowedOriginPatterns(List.of("*"));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Auth-Token", "Origin", "Accept"));
-        configuration.setExposedHeaders(List.of("Authorization"));
+
+        configuration.setAllowedMethods(
+                Arrays.asList(
+                        "GET",
+                        "POST",
+                        "PUT",
+                        "PATCH",
+                        "DELETE",
+                        "OPTIONS"
+                ));
+
+        configuration.setAllowedHeaders(
+                Arrays.asList(
+                        "Authorization",
+                        "Content-Type",
+                        "X-Auth-Token",
+                        "Origin",
+                        "Accept"
+                ));
+
+        configuration.setExposedHeaders(
+                List.of("Authorization"));
+
         configuration.setAllowCredentials(true);
 
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        UrlBasedCorsConfigurationSource source =
+                new UrlBasedCorsConfigurationSource();
+
         source.registerCorsConfiguration("/**", configuration);
+
         return source;
     }
 }
